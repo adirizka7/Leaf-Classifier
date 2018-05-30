@@ -3,6 +3,8 @@ from flask_uploads import UploadSet, configure_uploads, IMAGES
 
 import sys
 import os
+import pickle
+import cPickle
 import itertools
 import random
 from PIL import Image  # PIL
@@ -33,7 +35,7 @@ photos = UploadSet('photos', IMAGES)
 app.config['UPLOADED_PHOTOS_DEST'] = 'static/img'
 configure_uploads(app, photos)
 
-@app.route("/upload", methods=['GET', 'POST'])
+@app.route("/", methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST' and 'photo' in request.files:
         filename = photos.save(request.files['photo'])
@@ -44,7 +46,16 @@ def upload():
 
         return str(results)
 
+    return render_template('index.html')
+
+@app.route("/species", methods=['GET', 'POST'])
+def species():
+    return render_template('Species.html')
+
+@app.route("/up", methods=['GET', 'POST'])
+def up():
     return render_template('upload.html')
+
 
 def classifyadi(models, dataSet):
     predClazz, prob = predict(models, dataSet[0])
@@ -155,7 +166,19 @@ def buildTrainTestVectors(imgs, generateTuningData):
 
 if __name__ == "__main__":
     train, tune, test = getData(IS_TUNING)
-    models = getModels(train)
+    flag = True
+    models = {}
+    for i in CLASSES:
+        models[i] = svm_load_model("model_"+i)
+        if models[i] == None:
+            flag = False
+
+    if flag==False : 
+        models = getModels(train)
+        
+        for clazz, model in models.iteritems():
+            svm_save_model("model_"+clazz, model) 
+
     results = None
     if IS_TUNING:
         print "!!! TUNING MODE !!!"
