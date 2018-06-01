@@ -9,23 +9,13 @@ from PIL import Image  # PIL
 from svmutil import *  # libSVM
 import cv2
 import numpy as np
+
 # Image data constants
 DIMENSION = 32
 ROOT_DIR = "images_2/"
-DAL = "Chinese_Tallow"
-DOLLAR = "Euphorbia_Mili"
-PIZZA = "excoecaria"
-BALL = "Garden_Croton"
-FLOWER = "Hevea_Brasilinsis"
-CLASSES = [DAL, DOLLAR, PIZZA, BALL, FLOWER]
 
-# libsvm constants
-LINEAR = 0
-RBF = 2
+CLASSES = ["Chinese_Tallow", "Euphorbia_Mili", "excoecaria", "Garden_Croton", "Hevea_Brasilinsis"]
 
-# Other
-USE_LINEAR = False
-IS_TUNING = False
 
 app = Flask(__name__)
 
@@ -38,12 +28,15 @@ configure_uploads(app, photos)
 def upload():
     if request.method == 'POST' and 'photo' in request.files:
         filename = photos.save(request.files['photo'])
-        
-        imgs = [Image.open('static/img/' + filename).resize((DIMENSION, DIMENSION))]
-        imgs = [list(itertools.chain.from_iterable(img.getdata())) for img in imgs]
-        results = classifyadi(models, imgs)
+        dir_saved = 'static/img/' + filename
+        # PraProses
+        remove_background(dir_saved)
 
-        return str(results)
+        img = Image.open(dir_saved).resize((DIMENSION, DIMENSION))
+        img = list(itertools.chain.from_iterable(img.getdata()))
+        predClazz, prob = predict(models, img)
+        print prob
+        return str(predClazz)
 
     return render_template('index.html')
 
@@ -55,10 +48,6 @@ def species():
 def up():
     return render_template('upload.html')
 
-
-def classifyadi(models, dataSet):
-    predClazz, prob = predict(models, dataSet[0])
-    return predClazz
 
 def classify(models, dataSet):
     results = {}
@@ -77,20 +66,16 @@ def predict(models, item):
     maxProb = 0.0
     bestClass = ""
     for clazz, model in models.iteritems():
-        prob = predictSingle(model, item)
+        output = svm_predict([0], [item], model, "-q -b 1")
+        prob = output[2][0][0]
         if prob > maxProb:
             maxProb = prob
             bestClass = clazz
     return (bestClass, maxProb)
 
-def predictSingle(model, item):
-    output = svm_predict([0], [item], model, "-q -b 1")
-    prob = output[2][0][0]
-    return prob
-
 def getModels(trainingData):
     models = {}
-    param = getParam(USE_LINEAR)
+    param = getParam()
     for c in CLASSES:
         labels, data = getTrainingData(trainingData, c)
         prob = svm_problem(labels, data)
@@ -109,16 +94,12 @@ def getTrainingData(trainingData, clazz):
     labels, data = unzipped[0], unzipped[1]
     return (labels, data)
 
-def getParam(linear = True):
+def getParam():
     param = svm_parameter("-q")
     param.probability = 1
-    if(linear):
-        param.kernel_type = LINEAR
-        param.C = .01
-    else:
-        param.kernel_type = RBF
-        param.C = .01
-        param.gamma = .00000001
+    param.kernel_type = 2 # RBF
+    param.C = .01
+    param.gamma = .00000001
     return param
 
 def getLabeledDataVector(dataset, clazz, label):
@@ -127,30 +108,19 @@ def getLabeledDataVector(dataset, clazz, label):
     output = zip(labels, data)
     return output
 
-def getData(generateTuningData):
-    trainingData = {}
-    tuneData = {}
-    testData = {}
-
-    for clazz in CLASSES:
-        (train, tune, test) = buildTrainTestVectors(buildImageList(ROOT_DIR + clazz + "/"), generateTuningData)
-        trainingData[clazz] = train
-        tuneData[clazz] = tune
-        testData[clazz] = test
-
-    return (trainingData, tuneData, testData)
 
 def buildImageList(dirName):
-    remove_background(dirName)
+    for fileName in os.listdir(dirName):
+        remove_background(dirName+fileName)
     imgs = [Image.open(dirName + fileName).resize((DIMENSION, DIMENSION)) for fileName in os.listdir(dirName)]
     imgs = [list(itertools.chain.from_iterable(img.getdata())) for img in imgs]
     return imgs
 
-def remove_background(dirName):
-    for fileName in os.listdir(dirName):
+
+# remove backgound  = PRAPROSES PCD
+def remove_background(file_location):
         ### CROP
-        print fileName
-        img = cv2.imread(dirName+fileName)
+        img = cv2.imread(file_location)
 
         ## (1) Convert to gray, and threshold
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -184,28 +154,13 @@ def remove_background(dirName):
         backtorgb = cv2.cvtColor(inverted,cv2.COLOR_GRAY2RGB)
 
         hasil = cv2.subtract(dst,backtorgb)
-        cv2.imwrite(dirName+fileName,hasil)
+        cv2.imwrite(file_location,hasil)
 
-def buildTrainTestVectors(imgs, generateTuningData):
-    # 70% for training, 30% for test.
-    testSplit = int(len(imgs))
-    baseTraining = imgs[:testSplit]
-    test = imgs[testSplit:]
 
-    training = None
-    tuning = None
-    if generateTuningData:
-        # 50% of training for true training, 50% for tuning.
-        tuneSplit = int(.5 * len(baseTraining))
-        training = baseTraining[:tuneSplit]
-        tuning = baseTraining[tuneSplit:]
-    else:
-        training = baseTraining
-
-    return (training, tuning, test)
 
 if __name__ == "__main__":
-    train, tune, test = getData(IS_TUNING)
+    
+    ### CEK APAKAH ADA MODEL ADA ATAU TIDAK
     flag = True
     models = {}
     for i in CLASSES:
@@ -214,17 +169,16 @@ if __name__ == "__main__":
             flag = False    
 
     if flag==False : 
-        models = getModels(train)
+        trainingData = {}
+        for clazz in CLASSES:
+            train = buildImageList(ROOT_DIR + clazz + "/")
+            trainingData[clazz] = train
+
+        train = trainingData
+        models = getModels(trainingData)
         
         for clazz, model in models.iteritems():
             svm_save_model("model_"+clazz, model) 
-
-    results = None
-    if IS_TUNING:
-        print "!!! TUNING MODE !!!"
-        results = classify(models, tune)
-    else:
-        results = classify(models, test)
 
     app.run()
 
