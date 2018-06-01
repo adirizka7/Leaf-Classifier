@@ -48,6 +48,50 @@ def species():
 def up():
     return render_template('upload.html')
 
+###############################  PCD  ###########################
+# remove backgound  = PRAPROSES PCD
+def remove_background(file_location):
+        ### CROP
+        img = cv2.imread(file_location)
+
+        ## (1) Convert to gray, and threshold
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        th, threshed = cv2.threshold(gray, 140, 255, cv2.THRESH_BINARY_INV)
+
+        ## (2) Morph-op to remove noise
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11,11))
+        morphed = cv2.morphologyEx(threshed, cv2.MORPH_CLOSE, kernel)
+
+        ## (3) Find the max-area contour
+        _, cnts, _ = cv2.findContours(morphed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnt = sorted(cnts, key=cv2.contourArea)[-1]
+
+        ## (4) Crop and save it
+        x,y,w,h = cv2.boundingRect(cnt)
+        dst = img[y:y+h, x:x+w]
+        
+
+        ### REMOVE WHITE
+
+
+        gray = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
+
+        # Adaptive threshold
+        threshed2 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_MEAN_C,\
+                    cv2.THRESH_BINARY_INV,251,6)
+        # Ukuran kernel
+        kernel = np.ones((8,8), np.uint8)
+        # dilasi sebanyak 10 kali
+        dilation = cv2.dilate(threshed2,kernel,iterations = 10)
+        # dibalikin, dari item ke putih, sebaliknya
+        inverted = cv2.bitwise_not(dilation)
+        backtorgb = cv2.cvtColor(inverted,cv2.COLOR_GRAY2RGB)
+
+        # di subtract, supaya area background ilang
+        hasil = cv2.subtract(dst,backtorgb)
+        cv2.imwrite(file_location,hasil)
+
+###############################  Sisdas  ###########################
 
 def classify(models, dataSet):
     results = {}
@@ -117,49 +161,8 @@ def buildImageList(dirName):
     return imgs
 
 
-# remove backgound  = PRAPROSES PCD
-def remove_background(file_location):
-        ### CROP
-        img = cv2.imread(file_location)
-
-        ## (1) Convert to gray, and threshold
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        th, threshed = cv2.threshold(gray, 140, 255, cv2.THRESH_BINARY_INV)
-
-        ## (2) Morph-op to remove noise
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11,11))
-        morphed = cv2.morphologyEx(threshed, cv2.MORPH_CLOSE, kernel)
-
-        ## (3) Find the max-area contour
-        _, cnts, _ = cv2.findContours(morphed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnt = sorted(cnts, key=cv2.contourArea)[-1]
-
-        ## (4) Crop and save it
-        x,y,w,h = cv2.boundingRect(cnt)
-        dst = img[y:y+h, x:x+w]
-        
-
-        ### REMOVE WHITE
-
-        ## (1) Convert to gray, and threshold
-        gray = cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY)
-        # th, threshed = cv2.threshold(gray, 163, 255, cv2.THRESH_BINARY_INV)
-        threshed2 = cv2.adaptiveThreshold(gray,255,cv2.ADAPTIVE_THRESH_MEAN_C,\
-                    cv2.THRESH_BINARY_INV,251,6)
-
-        kernel = np.ones((8,8), np.uint8)
-
-        dilation = cv2.dilate(threshed2,kernel,iterations = 10)
-        inverted = cv2.bitwise_not(dilation)
-        backtorgb = cv2.cvtColor(inverted,cv2.COLOR_GRAY2RGB)
-
-        hasil = cv2.subtract(dst,backtorgb)
-        cv2.imwrite(file_location,hasil)
-
-
 
 if __name__ == "__main__":
-    
     ### CEK APAKAH ADA MODEL ADA ATAU TIDAK
     flag = True
     models = {}
