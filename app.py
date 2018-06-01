@@ -136,7 +136,7 @@ def getTrainingData(trainingData, clazz):
 def getParam():
     param = svm_parameter("-q")
     param.probability = 1
-    param.kernel_type = 2 # RBF
+    param.kernel_type = 2 # Radial Basis Function, real-valued function whose value depends only on the distance from the origin
     param.C = .01
     param.gamma = .00000001
     return param
