@@ -31,12 +31,11 @@ def upload():
         dir_saved = 'static/img/' + filename
         # PraProses
         remove_background(dir_saved)
-
         img = Image.open(dir_saved).resize((DIMENSION, DIMENSION))
         img = list(itertools.chain.from_iterable(img.getdata()))
         predClazz, prob = predict(models, img)
-        print prob
-        return str(predClazz)
+        print prob 
+        return render_template('index.html',balikan="1",tipe=str(predClazz))
 
     return render_template('index.html')
 
