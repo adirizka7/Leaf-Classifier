@@ -14,7 +14,7 @@ import numpy as np
 
 # Image data constants
 DIMENSION = 32
-ROOT_DIR = "images_2/"
+ROOT_DIR = "images/"
 
 # Class dari daun yang diiginkan
 # Dibuat list agar mudah saat parsing direktori dan lebih dinamis jikalau ingin ditambahkan daun lainnya
