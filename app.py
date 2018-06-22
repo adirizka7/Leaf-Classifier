@@ -1,6 +1,8 @@
+# import utilitas flask basic
 from flask import Flask, render_template, request
 from flask_uploads import UploadSet, configure_uploads, IMAGES
 
+# import general
 import sys
 import os
 import itertools
@@ -14,6 +16,8 @@ import numpy as np
 DIMENSION = 32
 ROOT_DIR = "images_2/"
 
+# Class dari daun yang diiginkan
+# Dibuat list agar mudah saat parsing direktori dan lebih dinamis jikalau ingin ditambahkan daun lainnya
 CLASSES = ["Chinese_Tallow", "Euphorbia_Mili", "excoecaria", "Garden_Croton", "Hevea_Brasilinsis"]
 
 
@@ -24,6 +28,7 @@ photos = UploadSet('photos', IMAGES)
 app.config['UPLOADED_PHOTOS_DEST'] = 'static/img'
 configure_uploads(app, photos)
 
+############### Routing ####################
 @app.route("/", methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST' and 'photo' in request.files:
@@ -88,6 +93,7 @@ def remove_background(file_location):
 
 ###############################  Sisdas  ###########################
 
+# Fungsi yang mengklasifikasi daun berdasarkan model dari argumen
 def classify(models, dataSet):
     results = {}
     for trueClazz in CLASSES:
@@ -100,6 +106,7 @@ def classify(models, dataSet):
             if trueClazz == predClazz: correct += 1
         results[trueClazz] = (count, correct)
     return results
+
 
 def predict(models, item):
     maxProb = 0.0
@@ -133,6 +140,7 @@ def getTrainingData(trainingData, clazz):
     labels, data = unzipped[0], unzipped[1]
     return (labels, data)
 
+# init pada libsvm
 def getParam():
     param = svm_parameter("-q")
     param.probability = 1
@@ -158,6 +166,7 @@ def buildImageList(dirName):
 
 
 if __name__ == "__main__":
+    # Mulai disini
     ### CEK APAKAH ADA MODEL ADA ATAU TIDAK
     flag = True
     models = {}
@@ -177,6 +186,6 @@ if __name__ == "__main__":
         
         for clazz, model in models.iteritems():
             svm_save_model("model_"+clazz, model) 
-
-    app.run()
+    # inisialisasi di port 7474 dan supaya bisa diakses publik
+    app.run(port="7474",host="0.0.0.0")
 
